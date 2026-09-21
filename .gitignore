@@ -1,0 +1,25 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Cache
+.cache/
+*.cache
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary scripts
+convert_to_pdf.ps1
+debug_startup.py
+FIX_SUMMARY.md
