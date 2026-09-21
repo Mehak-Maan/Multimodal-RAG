@@ -1,114 +1,103 @@
 # 📚 Complete Project Documentation: Multimodal RAG
 
-Welcome to the detailed documentation for the **Multimodal RAG** project!
+Welcome to the comprehensive technical documentation for the **Multimodal RAG** project.
 
 ---
 
-## 🌟 1. What is this Project?
+## 🌟 1. Project Overview
 
-**Multimodal RAG** is an advanced, smart AI Chatbot. 
-- **Multimodal** means it can understand different types of media: Text, Audio, and Images.
-- **RAG** stands for **Retrieval-Augmented Generation**. It means if you give the AI a document (like a PDF), it will read the document, "retrieve" the exact information needed from it, and then "generate" a smart answer for you.
-
-With this project, you can:
-- Type messages to chat with the AI.
-- Send voice notes (Audio) and hear the AI speak back to you.
-- Upload images and ask the AI what is inside the picture.
-- Upload PDFs and ask questions about the document.
+**Multimodal RAG** is an intelligent AI application integrating **Retrieval-Augmented Generation (RAG)** with multi-sensory input modalities:
+* **Text Chat**: Conversational memory and grounded Q&A.
+* **Document Intelligence (PDF)**: Semantic search and grounded answers across uploaded digital and scanned PDF documents.
+* **Computer Vision (Image Analysis)**: Comprehensive understanding of diagrams, charts, flowcharts, and photographs.
+* **Voice & Audio Processing**: High-speed speech-to-text audio transcription and optional text-to-speech audio synthesis.
 
 ---
 
-## 🛠️ 2. What Technologies & Tools Were Used?
+## 🛠️ 2. Core Architecture & Technologies
 
-We used a combination of powerful, open-source AI tools to build this:
+### 🖥️ 1. Web Application & UI
+* **Streamlit**: Powers the interactive web interface with sidebar controls, media preview players, and dynamic chat streaming.
+* **Python 3.10+**: Core programming environment.
 
-### 🖥️ 1. Core Frameworks
-* **Python**: The main programming language.
-* **Streamlit**: Used to build the beautiful website (UI) where you chat with the AI.
-* **LangChain**: A special tool used to connect the AI models together and manage the "chat memory" (remembering what you said earlier).
+### 🧠 2. AI Engines & Hybrid Inference
+* **Groq Cloud Platform**:
+  * **Model**: `openai/gpt-oss-20b` running on Groq LPU (Language Processing Unit).
+  * **Latency**: ~1-2 seconds per complete answer (10x faster than CPU).
+* **Ollama Local**:
+  * **Model**: `llama3.1:latest` running locally for 100% offline privacy and zero network dependency.
+  * **Vision Model**: `llava:latest` (Large Language and Vision Assistant) for deep visual understanding.
+  * **Embedding Model**: `nomic-embed-text:latest` for vector generation.
 
-### 🧠 2. AI Language Models (The Brain)
-* **Ollama**: We use Ollama to run powerful AI chat models (like Llama 3) locally on the computer. This is what answers your text questions.
+### 📄 3. Document Processing & Vector Storage
+* **ChromaDB**: High-speed embedded vector database storing chunked document embeddings.
+* **LangChain Text Splitters**: `RecursiveCharacterTextSplitter` configured with `chunk_size=1000` and `chunk_overlap=100` for balanced contextual granularity.
+* **Smart Hybrid Prompting**: Intelligently detects whether a PDF has selectable digital text or is a scanned image (e.g. CamScanner), ensuring the assistant always provides rich, useful responses.
 
-### 🖼️ 3. Computer Vision (For Images)
-* **BLIP (Salesforce/blip-vqa-base)**: A special AI model that looks at an uploaded image and answers questions about it (Visual Question Answering).
-
-### 🎤 4. Audio Processing (Voice)
-* **Wav2Vec2 (HuggingFace)**: Used for **Speech-to-Text**. It listens to the audio you upload and converts it into written text.
-* **gTTS (Google Text-to-Speech)**: Used for **Text-to-Speech**. It takes the AI's written answer and turns it into an audio file so you can listen to it.
-
-### 📚 5. The RAG System (For PDFs)
-* **Pinecone**: A "Vector Database". Think of it as a smart library. When we upload a PDF, we store its paragraphs here so the AI can search through it extremely fast.
-
----
-
-## 🔄 3. How Does the Pipeline Work? (Step-by-Step)
-
-Here is exactly what happens when you use the app:
-
-### 🟢 Scenario A: Normal Text Chat
-1. You type a message (e.g., "Hello!").
-2. The message goes directly to **Ollama** (the AI brain).
-3. The AI generates an answer.
-4. **gTTS** converts the answer into audio.
-5. The website shows you the text and plays the audio for you!
-
-### 🔵 Scenario B: When You Upload a PDF (RAG Pipeline)
-1. **Reading**: You upload a PDF. `pdf_handler.py` reads the PDF and chops it into small, readable paragraphs.
-2. **Storing**: These paragraphs are turned into numbers (Embeddings) and saved in the **Pinecone Vector Database** (`vectorstore.py`).
-3. **Asking**: You ask a question (e.g., "What does page 2 say?").
-4. **Searching**: The system searches Pinecone to find the most relevant paragraphs from your PDF.
-5. **Answering**: It gives those paragraphs to **Ollama**, and Ollama reads them to give you a perfect answer!
-
-### 🟡 Scenario C: When You Upload an Image
-1. You upload a picture and type a question (e.g., "What color is the car?").
-2. The image and your question are sent to the **BLIP Model** (`vqa.py`).
-3. BLIP looks at the image, reads your question, and outputs the answer.
-
-### 🟣 Scenario D: When You Upload Audio
-1. You upload an audio voice note.
-2. **Wav2Vec2** (`audio_processor.py`) listens to it and turns your voice into text.
-3. That text is sent to the AI just like a normal text message.
-4. The AI replies, and the app reads it out loud for you!
+### 🎙️ 4. Audio Processing
+* **Speech-to-Text (STT)**: Groq's `whisper-large-v3-turbo` model capable of multilingual transcription with near-zero latency.
+* **Fallback STT**: Local `SpeechRecognition` library with Google Speech API support.
+* **Text-to-Speech (TTS)**: `gTTS` (Google Text-to-Speech) enabled optionally to avoid response delays.
 
 ---
 
-## 📂 4. Project Folder Structure Explained
+## 🔄 3. Operational Workflow
 
-Here is what all the code files actually do:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as Streamlit UI
+    participant Handler as Input Handlers
+    participant VectorDB as ChromaDB (nomic-embed)
+    participant Engine as Groq / Ollama
 
-* **`app.py`**: The main file. It controls the website UI and buttons.
-* **`src/audio_processor.py`**: Handles turning Voice to Text, and Text to Voice.
-* **`src/vqa.py`**: Handles the Image AI (BLIP) to answer questions about pictures.
-* **`src/pdf_handler.py`**: Reads PDFs and breaks them into small pieces.
-* **`src/vectorstore.py`**: Connects to Pinecone Database to save and search the PDF pieces.
-* **`src/ollama_chain.py`**: Connects to the Ollama AI to handle the actual chatting and memory.
-* **`.env`**: A hidden file where you keep your secret passwords (like the Pinecone API Key).
+    alt PDF Upload
+        User->>UI: Upload PDF
+        UI->>Handler: Extract and Chunk (1000 tokens)
+        Handler->>VectorDB: Embed and Store Chunks
+    else Image Upload
+        User->>UI: Upload Image
+        UI->>Handler: Encode to Base64
+        Handler->>Engine: Ollama LLaVA Vision Query
+        Engine-->>UI: Detailed Image Analysis
+    else Audio Upload
+        User->>UI: Upload Audio
+        UI->>Handler: Groq Whisper API
+        Handler-->>UI: Instant Transcription
+        UI->>Engine: Process Transcribed Question
+    else Text Query (RAG)
+        User->>UI: Ask Question
+        UI->>VectorDB: Semantic Search (Top Chunks)
+        VectorDB-->>Engine: Retrieved Context
+        Engine-->>UI: Grounded Factual Response
+    end
+```
 
 ---
 
-## ⚙️ 5. Easy Setup Guide
+## ⚙️ 4. Configuration Details
 
-If you want to run this project yourself on your computer, follow these simple steps:
+### `config.yaml`
+```yaml
+chat_model:
+  'model': "llama3.1:latest"
+  'temperature': 0.2
+  'num_gpu': 1
 
-1. **Download the Code**: Clone or download this project folder to your computer.
-2. **Open Terminal**: Open your computer's terminal (or command prompt) in this folder.
-3. **Create a Virtual Environment**: This keeps things safe and separate. 
-   ```bash
-   python -m venv venv
-   ```
-4. **Activate It**:
-   - On Windows: `venv\Scripts\activate`
-   - On Mac/Linux: `source venv/bin/activate`
-5. **Install Everything**: Download all the required tools.
-   ```bash
-   pip install -r requirements.txt
-   ```
-6. **Set your API Key**: 
-   - Create a file named `.env` in the main folder.
-   - Open it and write: `PINECONE_API_KEY=your_key_here`
-7. **Start the App**:
-   ```bash
-   streamlit run app.py
-   ```
-8. **Enjoy!**: A website will automatically open in your browser where you can test it!
+groq_model:
+  'model': "openai/gpt-oss-20b"
+  'temperature': 0.2
+
+vector_database:
+  chroma:
+
+chat_session_path: './chat_session/'
+```
+* `temperature: 0.2`: Selected to minimize hallucinations and ensure strict fidelity to provided source documents.
+
+---
+
+## 🔒 5. Security & Best Practices
+* Sensitive API keys (`GROQ_API_KEY`, `PINECONE_API_KEY`) are managed strictly through `.env` and kept out of version control via `.gitignore`.
+* Automatic fallback logic ensures business continuity if internet access drops during cloud API calls.

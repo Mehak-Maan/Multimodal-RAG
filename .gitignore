@@ -1,25 +1,20 @@
-# Environment
+# Environment variables
 .env
-venv/
-.venv/
+*.env
 
-# Python
+# Python cache & virtual environment
 __pycache__/
 *.py[cod]
-*.pyo
-*.egg-info/
-dist/
-build/
+*$py.class
+venv/
+.venv/
+env/
 
-# Cache
+# Application Cache & Vector Database
 .cache/
-*.cache
+chat_session/
 
-# IDE
+# IDE files
 .vscode/
 .idea/
-
-# Temporary scripts
-convert_to_pdf.ps1
-debug_startup.py
-FIX_SUMMARY.md
+*.swp

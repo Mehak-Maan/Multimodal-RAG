@@ -1,35 +1,54 @@
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="transformers")
-warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
-
-import requests
-from PIL import Image
-from transformers import BlipProcessor, BlipForQuestionAnswering, Wav2Vec2Processor, Wav2Vec2ForCTC
+import base64
 import os
-import torch
-import torchaudio
+import requests
+from io import BytesIO
+from PIL import Image
 
-processor = BlipProcessor.from_pretrained("Salesforce/blip-vqa-base")
-model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
-
-audio_processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-audio_model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-
-def answer_visual_question(image_path_or_url: str, question: str) -> str:
+def encode_image_to_base64(image_path_or_url: str) -> str:
+    """Read image file or download from URL and return base64 string."""
     if os.path.isfile(image_path_or_url):
-        raw_image = Image.open(image_path_or_url).convert('RGB')
+        with open(image_path_or_url, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
     else:
-        raw_image = Image.open(requests.get(image_path_or_url, stream=True).raw).convert('RGB')
-    
-    inputs = processor(raw_image, question, return_tensors="pt")
-    out = model.generate(**inputs)
-    return processor.decode(out[0], skip_special_tokens=True)
+        response = requests.get(image_path_or_url, stream=True)
+        return base64.b64encode(response.content).decode('utf-8')
 
-def transcribe_audio(audio_path: str) -> str:
-    waveform, sample_rate = torchaudio.load(audio_path)
-    inputs = audio_processor(waveform, sampling_rate=sample_rate, return_tensors="pt", padding=True)
-    with torch.no_grad():
-        logits = audio_model(inputs.input_values).logits
-    predicted_ids = torch.argmax(logits, dim=-1)
-    transcription = audio_processor.batch_decode(predicted_ids)
-    return transcription[0]
+def answer_visual_question(image_path_or_url: str, question: str = "") -> str:
+    """
+    High-accuracy Visual Question Answering using Ollama's LLaVA (Vision-Language Model).
+    Accurately understands diagrams, documents, photos, and answers in full detail.
+    """
+    try:
+        b64_image = encode_image_to_base64(image_path_or_url)
+        
+        if not question or question.strip() == "":
+            prompt = (
+                "Describe this image thoroughly and accurately. Identify all key objects, text, "
+                "diagrams, or relevant details visible."
+            )
+        else:
+            prompt = (
+                f"Examine this image with extreme accuracy and answer the following question in detail:\n"
+                f"Question: {question.strip()}"
+            )
+            
+        payload = {
+            "model": "llava",
+            "prompt": prompt,
+            "images": [b64_image],
+            "stream": False,
+            "options": {
+                "temperature": 0.2  # Low temperature for factual precision
+            }
+        }
+        
+        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=90)
+        if res.status_code == 200:
+            return res.json().get("response", "Could not generate response from image.").strip()
+        else:
+            return f"Error from Vision model: HTTP {res.status_code} - {res.text}"
+            
+    except requests.exceptions.ConnectionError:
+        return "Error: Ollama service is not running. Please make sure Ollama is open and running."
+    except Exception as e:
+        return f"Error analyzing image: {str(e)}"

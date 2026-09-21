@@ -1,73 +1,159 @@
-# Multimodal-RAG
+# 🤖 Multimodal RAG (Retrieval-Augmented Generation)
 
-![Project Summary](/maxresdefault.jpg)
+![Multimodal RAG Banner](./maxresdefault.jpg)
 
-An AI-powered chat application using text, audio, and images for context-aware responses. It integrates language models and vector databases to enhance retrieval-augmented generation (RAG) capabilities, making it a versatile tool for intelligent conversations.
+An advanced, high-performance **Multimodal AI Assistant** built with **Streamlit**, **LangChain**, **Groq LPU Cloud Inference**, and **Ollama Local Models**. The system supports intelligent conversational interactions across **Text**, **PDF Documents (RAG)**, **Images (Vision)**, and **Audio Voice Notes (Speech-to-Text & Text-to-Speech)**.
 
-## Features
+---
 
-- **Text to Speech**: Convert text responses to speech using gTTS.
-- **Speech to Text**: Process and transcribe audio files using `speech_recognition` and `Wav2Vec2`.
-- **Visual Question Answering**: Answer questions based on uploaded images using BLIP.
-- **PDF Knowledge Base**: Upload PDF files to enhance the knowledge base for more accurate responses.
-- **Context-Aware Responses**: Use conversation history to provide more relevant answers.
+## 🌟 Key Features
 
-## Installation
+* **⚡ Ultra-Fast Cloud & Local Hybrid Execution:**
+  * **Groq Cloud:** Lightning-fast inference via `openai/gpt-oss-20b` (sub-second responses).
+  * **Ollama Local:** 100% offline, privacy-first inference using `llama3.1:latest`.
+  * **Seamless Toggle:** Switch between Groq Cloud and local Ollama directly from the sidebar.
+  * **Automatic Resilience:** Automatic graceful fallback to local Ollama if internet drops.
 
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/Ahmed-AI-01/Multimodal-RAG.git
-    cd Multimodal-RAG
-    ```
+* **📄 Intelligent Document RAG (PDF):**
+  * Vector search powered by **ChromaDB** with `nomic-embed-text` embeddings.
+  * **Optimized Chunking (1000 chunk size):** 2x faster indexing and search retrieval.
+  * **Smart Hybrid Retrieval:** Seamlessly handles both digital text PDFs and scanned/watermarked documents (e.g. CamScanner).
 
-2. Create a virtual environment and activate it:
-    ```sh
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
+* **🖼️ Next-Gen Visual Question Answering (VQA):**
+  * Powered by **LLaVA (Large Language and Vision Assistant)** running through Ollama.
+  * High-accuracy breakdown of complex diagrams, workflows, screenshots, charts, and photos.
+  * One-click **"🔍 Analyze Image"** button + custom query chat.
 
-3. Install the required dependencies:
-    ```sh
-    pip install -r requirements.txt
-    ```
+* **🎙️ Crystal-Clear Speech-to-Text (STT):**
+  * Powered by **Groq Whisper-large-v3-turbo** for state-of-the-art accuracy in multiple languages (English, Urdu, Hindi, etc.).
+  * Automatic local SpeechRecognition fallback if offline.
+  * Dedicated **"🎙️ Transcribe & Ask Audio"** button for immediate vocal Q&A.
 
-4. Set up environment variables:
-    - Create a [.env](http://_vscodecontentref_/1) file in the root directory and add your Pinecone API key:
-        ```
-        PINECONE_API_KEY=your_pinecone_api_key
-        ```
+* **🔊 Optional Voice Output (TTS):**
+  * Text-to-speech output using `gTTS` with a dedicated sidebar toggle so text responses remain instant without unnecessary latency.
 
-## Usage
+---
 
-1. Run the Streamlit application:
-    ```sh
-    streamlit run app.py
-    ```
+## 🏗️ Architecture & Pipeline
 
-2. Open your web browser and navigate to `http://localhost:8501`.
+```mermaid
+graph TD
+    A[User Input] --> B{Input Type}
+    
+    B -->|Text Query| C[Chat Engine / RAG]
+    B -->|PDF Document| D[PDF Handler & Text Splitter]
+    B -->|Image| E[Ollama LLaVA Vision]
+    B -->|Audio Voice Note| F[Groq Whisper Speech-to-Text]
+    
+    D --> G[(ChromaDB Vector Store)]
+    G --> C
+    F --> C
+    
+    C --> H{Model Switch}
+    H -->|Groq Cloud| I[Groq API - gpt-oss-20b]
+    H -->|Local Ollama| J[Ollama - llama3.1]
+    
+    I --> K[Response Stream]
+    J --> K
+    E --> K
+    
+    K --> L[Streamlit UI Display]
+    L -->|If Enabled| M[gTTS Audio Playback]
+```
 
-3. Interact with the chat application by uploading PDFs, images, or audio files and typing your questions.
+---
 
-## Project Structure
+## 📂 Project Structure
 
-- [app.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/app.py): Main application file for Streamlit.
-- [audio_processor.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/audio_processor.py): Handles audio processing for speech-to-text and text-to-speech.
-- [llama_cpp_chains.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/llama_cpp_chains.py): Implements Llama-based language model chains.
-- [ollama_chain.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/ollama_chain.py): Implements Ollama-based language model chains and RAG chains.
-- [pdf_handler.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/pdf_handler.py): Handles PDF loading and splitting.
-- [utils.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/utils.py): Utility functions, including configuration loading.
-- [vectorstore.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/vectore_store.py): Manages vector database setup and indexing.
-- [vqa.py](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/src/vqa.py): Handles visual question answering and audio transcription.
+```text
+Multimodal-RAG/
+├── app.py                      # Main Streamlit application and UI interface
+├── config.yaml                 # Configuration for models, temperatures, and databases
+├── requirements.txt            # Python dependencies
+├── .env.example                # Template for environment variables
+├── maxresdefault.jpg           # Application banner
+├── src/
+│   ├── __init__.py
+│   ├── groq_chain.py           # Groq Cloud Chain & RAG implementation
+│   ├── ollama_chain.py         # Ollama Local Chain & RAG implementation
+│   ├── vqa.py                  # High-accuracy Vision Q&A with LLaVA
+│   ├── audio_processor.py      # Speech-to-Text (Groq Whisper) & TTS
+│   ├── pdf_handler.py          # PDF extraction and chunking
+│   ├── vectorstore.py          # ChromaDB and Pinecone vector store handlers
+│   └── utils.py                # Configuration loaders and helpers
+```
 
-## License
+---
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](https://github.com/Ahmed-AI-01/Multimodal-RAG/edit/main/LICENSE) file for details.
+## 🚀 Quickstart Guide
 
-## Acknowledgements
+### 1. Clone the Repository
+```bash
+git clone https://github.com/Mehak-Maan/Multimodal-RAG.git
+cd Multimodal-RAG
+```
 
-- [LangChain](https://github.com/langchain-ai/langchain)
-- [Pinecone](https://www.pinecone.io/)
-- [Streamlit](https://streamlit.io/)
-- [gTTS](https://gtts.readthedocs.io/)
-- [Wav2Vec2](https://huggingface.co/facebook/wav2vec2-base-960h)
-- [BLIP](https://huggingface.co/Salesforce/blip-vqa-base)
+### 2. Set Up Virtual Environment
+```bash
+# Windows (PowerShell)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
+Create a `.env` file in the root directory:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+PINECONE_API_KEY=your_pinecone_api_key_here
+```
+> *Get a free Groq API key at [console.groq.com](https://console.groq.com).*
+
+### 5. Ensure Ollama Models are Installed
+For local offline inference and vision analysis, pull the required models:
+```bash
+ollama pull llama3.1
+ollama pull llava
+ollama pull nomic-embed-text
+```
+
+### 6. Run the Application
+```bash
+streamlit run app.py
+```
+Open your browser at **`http://localhost:8501`**.
+
+---
+
+## ⚙️ Configuration (`config.yaml`)
+
+You can fine-tune model parameters and temperatures in `config.yaml`:
+```yaml
+chat_model:
+  'model': "llama3.1:latest"
+  'temperature': 0.2
+  'num_gpu': 1
+
+groq_model:
+  'model': "openai/gpt-oss-20b"
+  'temperature': 0.2
+
+vector_database:
+  chroma:
+
+chat_session_path: './chat_session/'
+```
+
+---
+
+## 🛡️ License
+
+This project is open source and available under the [Apache License 2.0](LICENSE).

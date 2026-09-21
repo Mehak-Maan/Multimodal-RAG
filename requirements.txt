@@ -14,5 +14,6 @@ langchain-community
 langchain-chroma
 langchain-pinecone
 langchain-ollama
+langchain-groq
 pypdf
 pyreadline3

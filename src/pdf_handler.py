@@ -40,8 +40,8 @@ def load_pdf_directory(directory):
 
 def split_pdf(pdfs: list[Document]):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=512,
-        chunk_overlap=64,
+        chunk_size=1000,
+        chunk_overlap=100,
         length_function=len,
         is_separator_regex=False
     )

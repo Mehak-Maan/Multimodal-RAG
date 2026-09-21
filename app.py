@@ -5,6 +5,7 @@ import os
 load_dotenv()
 
 from src.ollama_chain import OllamaChain, OllamaRAGChain
+from src.groq_chain import GroqChain, GroqRAGChain
 from src.pdf_handler import extract_pdf
 from src.vqa import answer_visual_question
 from src.audio_processor import AudioProcessor
@@ -12,25 +13,32 @@ audio_processor = AudioProcessor()
 
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 
-# --- FIXED: Load Chain with Session State ---
 def load_chain(_chat_memory):
-    # Agar PDF mode ON hai AUR file uploaded hai
+    use_groq = st.session_state.get('use_groq', False)
+    
+    # If PDF mode is active AND file is uploaded
     if st.session_state.get('pdf_chat') and st.session_state.get('uploaded_file'):
-        # Agar purani RAG chain maujood nahi ya knowledge change hui hai
-        if 'rag_chain' not in st.session_state or st.session_state.get('knowledge_change'):
+        if 'rag_chain' not in st.session_state or st.session_state.get('knowledge_change') or st.session_state.get('model_changed'):
             try:
-                st.session_state.rag_chain = OllamaRAGChain(_chat_memory, st.session_state.uploaded_file)
+                if use_groq:
+                    st.session_state.rag_chain = GroqRAGChain(_chat_memory, st.session_state.uploaded_file)
+                else:
+                    st.session_state.rag_chain = OllamaRAGChain(_chat_memory, st.session_state.uploaded_file)
                 st.session_state.knowledge_change = False
+                st.session_state.model_changed = False
             except Exception as e:
-                st.error(f"RAG Error: {e}")
+                st.error(f"RAG Initialization Error: {e}")
+                if use_groq:
+                    return GroqChain(_chat_memory)
                 return OllamaChain(_chat_memory)
         return st.session_state.rag_chain
     
-    # Default simple chat
+    # Default direct chat
+    if use_groq:
+        return GroqChain(_chat_memory)
     return OllamaChain(_chat_memory)
 
 def file_uploader_change():
-    # Jab bhi file badle, purani chain ko delete kar dein taake nayi file index ho
     if 'rag_chain' in st.session_state:
         del st.session_state.rag_chain
     st.session_state.knowledge_change = True
@@ -40,35 +48,34 @@ def file_uploader_change():
 
 def toggle_pdf_chat_change():
     clear_cache()
-    # Mode switch karne par knowledge base ko refresh karne ka signal dain
     st.session_state.knowledge_change = True
 
-def clear_input_field():
-    st.session_state.user_question = st.session_state.user_input
-    st.session_state.user_input = ""
-
-def set_send_input():
-    st.session_state.send_input = True
-    clear_input_field()
+def toggle_model_change():
+    if 'rag_chain' in st.session_state:
+        del st.session_state.rag_chain
+    st.session_state.model_changed = True
+    clear_cache()
 
 def clear_cache():
     st.cache_resource.clear()
 
 def initial_session_state():
-    if 'send_input' not in st.session_state:
-        st.session_state.send_input = False
     if 'knowledge_change' not in st.session_state:
         st.session_state.knowledge_change = False
-    if 'user_question' not in st.session_state:
-        st.session_state.user_question = ""
     if 'pdf_chat' not in st.session_state:
         st.session_state.pdf_chat = False
+    if 'use_groq' not in st.session_state:
+        st.session_state.use_groq = True  # Default to Groq for fast cloud inference
+    if 'model_changed' not in st.session_state:
+        st.session_state.model_changed = False
+    if 'pending_query' not in st.session_state:
+        st.session_state.pending_query = None
     os.makedirs('./.cache/temp_files', exist_ok=True)
 
 def main():
     st.set_page_config(page_title="Multimodal RAG", page_icon="🤖", layout="wide")
     st.title('🤖 Multimodal RAG')
-    st.markdown("Welcome to the **Multimodal RAG** application. Upload PDFs, images, or audio and chat with your AI assistant.")
+    st.markdown("Upload **PDF documents**, **images**, or **audio files** and chat with your multimodal AI assistant.")
     
     initial_session_state()
     chat_container = st.container()
@@ -76,71 +83,104 @@ def main():
     # Sidebar setup
     st.sidebar.title("🛠️ Settings & Uploads")
     
-    # Status indicator in sidebar
+    # Model selector toggle
+    st.sidebar.toggle('⚡ Use Groq Cloud (Fast & Accurate)', key='use_groq', on_change=toggle_model_change)
+    st.sidebar.checkbox('🔊 Voice Output (Audio TTS)', value=False, key='enable_tts')
+    
+    model_name = "Groq (gpt-oss-20b)" if st.session_state.use_groq else "Ollama (llama3.1)"
     if st.session_state.pdf_chat and st.session_state.uploaded_file:
-        st.sidebar.success("✅ RAG Mode: Active (Using PDF)")
+        st.sidebar.success(f"✅ RAG Active: {model_name}")
     else:
-        st.sidebar.info("💬 Chat Mode: Simple")
+        st.sidebar.info(f"💬 Chat Mode: {model_name}")
 
-    st.sidebar.toggle('PDF Chat Mode', key='pdf_chat', on_change=toggle_pdf_chat_change)
+    st.sidebar.toggle('📄 PDF Document Chat Mode', key='pdf_chat', on_change=toggle_pdf_chat_change)
     
     with st.sidebar.expander("📄 Document Upload (PDF)", expanded=True):
-        st.file_uploader('Upload your PDF files',
-                                type='pdf',
-                                accept_multiple_files=True,
-                                key='uploaded_file',
-                                on_change=file_uploader_change)
+        st.file_uploader(
+            'Upload PDF files',
+            type='pdf',
+            accept_multiple_files=True,
+            key='uploaded_file',
+            on_change=file_uploader_change
+        )
 
-    with st.sidebar.expander("🖼️ & 🎵 Media Upload"):
-        uploaded_image = st.file_uploader('Upload Images', type=['jpg', 'jpeg', 'png'], key='uploaded_image')
-        uploaded_audio = st.file_uploader('Upload Audio', type=['wav', 'mp3'], key='uploaded_audio')
+    with st.sidebar.expander("🖼️ & 🎵 Media Upload", expanded=True):
+        uploaded_image = st.file_uploader('Upload Image', type=['jpg', 'jpeg', 'png'], key='uploaded_image')
+        if uploaded_image:
+            st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
+            if st.button("🔍 Analyze Image", key="btn_analyze", use_container_width=True):
+                st.session_state.pending_query = "Describe this image in detail and identify all key elements and text."
+
+        uploaded_audio = st.file_uploader('Upload Audio', type=['wav', 'mp3', 'm4a'], key='uploaded_audio')
+        if uploaded_audio:
+            st.audio(uploaded_audio)
+            if st.button("🎙️ Transcribe & Ask Audio", key="btn_audio_ask", use_container_width=True):
+                st.session_state.pending_audio_ask = True
 
     chat_history = StreamlitChatMessageHistory(key='history')
-
-    # Load appropriate chain (Ab ye function zyada stable hai)
     llm_chain = load_chain(chat_history)
 
-    # Chat interface display
+    # Render previous messages
     with chat_container:
         for msg in chat_history.messages:
             st.chat_message(msg.type).write(msg.content)
 
-    # User Input area
-    user_query = st.chat_input('Message Multimodal RAG...')
+    # Chat input
+    chat_input_text = st.chat_input('Message Multimodal RAG...')
 
-    # Logic to process input
-    if user_query:
+    # Determine what query needs to be processed
+    user_query = None
+    is_audio_query = False
+
+    if chat_input_text:
+        user_query = chat_input_text
+    elif st.session_state.get('pending_query'):
+        user_query = st.session_state.pop('pending_query')
+    elif st.session_state.get('pending_audio_ask') and uploaded_audio:
+        st.session_state.pending_audio_ask = False
+        is_audio_query = True
+
+    # Process query
+    if user_query or is_audio_query:
         with chat_container:
+            # Handle audio transcription if audio triggered
+            if is_audio_query:
+                audio_path = os.path.join('./.cache/temp_files', uploaded_audio.name)
+                with open(audio_path, 'wb') as f:
+                    f.write(uploaded_audio.getvalue())
+                with st.spinner("🎙️ Transcribing audio with Groq Whisper..."):
+                    transcribed_text = audio_processor.audio_to_text(audio_path)
+                st.info(f"🎙️ **Transcribed Audio:** *\"{transcribed_text}\"*")
+                user_query = transcribed_text
+
             st.chat_message('user').write(user_query)
             
             with st.spinner("Thinking..."):
-                if uploaded_image:
+                # If image is uploaded and user query is asking about the image
+                if uploaded_image and not is_audio_query:
                     image_path = os.path.join('./.cache/temp_files', uploaded_image.name)
                     with open(image_path, 'wb') as f:
                         f.write(uploaded_image.getvalue())
+                    
                     llm_response = answer_visual_question(image_path, user_query)
-                
-                elif uploaded_audio:
-                    audio_path = os.path.join('./.cache/temp_files', uploaded_audio.name)
-                    with open(audio_path, 'wb') as f:
-                        f.write(uploaded_audio.getvalue())
-                    transcribed_text = audio_processor.audio_to_text(audio_path)
-                    st.info(f"Transcribed: {transcribed_text}")
-                    llm_response = llm_chain.run(user_input=transcribed_text)
-                
+                    chat_history.add_user_message(user_query)
+                    chat_history.add_ai_message(llm_response)
                 else:
+                    # Text or audio query passed to RAG / LLM chain
                     llm_response = llm_chain.run(user_input=user_query)
             
             st.chat_message('ai').write(llm_response)
 
-            # Audio Output logic
-            try:
-                audio_file = audio_processor.text_to_speech(llm_response)
-                if audio_file and os.path.exists(audio_file):
-                    with open(audio_file, 'rb') as f:
-                        st.audio(f.read(), format='audio/mp3')
-            except Exception:
-                pass
+            # Optional Text-to-Speech playback (disabled by default for instant text speed)
+            if st.session_state.get('enable_tts', False):
+                try:
+                    with st.spinner("🔊 Generating voice audio..."):
+                        audio_file = audio_processor.text_to_speech(llm_response)
+                        if audio_file and os.path.exists(audio_file):
+                            with open(audio_file, 'rb') as f:
+                                st.audio(f.read(), format='audio/mp3')
+                except Exception:
+                    pass
 
 if __name__ == '__main__':
     main()
