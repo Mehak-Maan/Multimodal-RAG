@@ -105,17 +105,26 @@ def main():
         )
 
     with st.sidebar.expander("🖼️ & 🎵 Media Upload", expanded=True):
-        uploaded_image = st.file_uploader('Upload Image', type=['jpg', 'jpeg', 'png'], key='uploaded_image')
-        if uploaded_image:
-            st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
-            if st.button("🔍 Analyze Image", key="btn_analyze", use_container_width=True):
-                st.session_state.pending_query = "Describe this image in detail and identify all key elements and text."
+        image_tab, audio_tab = st.tabs(["🖼️ Image / Camera", "🎵 Audio"])
+        
+        with image_tab:
+            uploaded_image = st.file_uploader('Upload Image File', type=['jpg', 'jpeg', 'png'], key='uploaded_image')
+            camera_image = st.camera_input('📷 Or Capture Live Photo', key='camera_image')
+            
+            # Active image is whichever was provided
+            active_image = camera_image if camera_image is not None else uploaded_image
+            
+            if active_image:
+                st.image(active_image, caption="Active Image (Auto-Enhanced for Clarity)", use_container_width=True)
+                if st.button("🔍 Analyze Image", key="btn_analyze", use_container_width=True):
+                    st.session_state.pending_query = "Describe this image in detail, extract any visible text or labels, and identify all key elements."
 
-        uploaded_audio = st.file_uploader('Upload Audio', type=['wav', 'mp3', 'm4a'], key='uploaded_audio')
-        if uploaded_audio:
-            st.audio(uploaded_audio)
-            if st.button("🎙️ Transcribe & Ask Audio", key="btn_audio_ask", use_container_width=True):
-                st.session_state.pending_audio_ask = True
+        with audio_tab:
+            uploaded_audio = st.file_uploader('Upload Audio', type=['wav', 'mp3', 'm4a'], key='uploaded_audio')
+            if uploaded_audio:
+                st.audio(uploaded_audio)
+                if st.button("🎙️ Transcribe & Ask Audio", key="btn_audio_ask", use_container_width=True):
+                    st.session_state.pending_audio_ask = True
 
     chat_history = StreamlitChatMessageHistory(key='history')
     llm_chain = load_chain(chat_history)
@@ -156,11 +165,12 @@ def main():
             st.chat_message('user').write(user_query)
             
             with st.spinner("Thinking..."):
-                # If image is uploaded and user query is asking about the image
-                if uploaded_image and not is_audio_query:
-                    image_path = os.path.join('./.cache/temp_files', uploaded_image.name)
+                # If image is present and not an audio query
+                if active_image and not is_audio_query:
+                    image_filename = getattr(active_image, 'name', 'camera_capture.jpg')
+                    image_path = os.path.join('./.cache/temp_files', image_filename)
                     with open(image_path, 'wb') as f:
-                        f.write(uploaded_image.getvalue())
+                        f.write(active_image.getvalue())
                     
                     llm_response = answer_visual_question(image_path, user_query)
                     chat_history.add_user_message(user_query)
